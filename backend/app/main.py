@@ -4,6 +4,7 @@ import json
 import shutil
 import threading
 import urllib.request
+import secrets
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
@@ -11,14 +12,14 @@ from app.services.delivery import DeliveryService
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data" / "jobs"
-FRONTEND = ROOT / "frontend" / "index.html"
+FRONTEND = ROOT / "frontend" / "app.html"
 JOBS: dict[str, dict] = {}
 API_KEYS: dict[str, str] = {}
 SHARES: dict[str, str] = {}
 SUPPORTED = {".png", ".jpg", ".jpeg", ".webp", ".pdf", ".csv", ".xlsx", ".xls", ".zip"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
-app = FastAPI(title="GraphMind API", version="0.5.0", description="Turn visual data into AI-ready knowledge and deliver it through APIs, webhooks and exports.")
+app = FastAPI(title="GraphMind API", version="0.5.1", description="Turn visual data into AI-ready knowledge and deliver it through APIs, webhooks and exports.")
 
 class JobResponse(BaseModel):
     job_id: str
@@ -55,10 +56,10 @@ def send_webhook(url: str, payload: dict) -> None:
     try:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "User-Agent": "GraphMind/0.5"}, method="POST")
-        with urllib.request.urlopen(request, timeout=10) as response:
-            return response.status
+        with urllib.request.urlopen(request, timeout=10):
+            pass
     except Exception:
-        return None
+        pass
 
 @app.get("/", include_in_schema=False)
 def frontend():
@@ -66,7 +67,7 @@ def frontend():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "graphmind", "version": "0.5.0"}
+    return {"status": "ok", "service": "graphmind", "version": "0.5.1"}
 
 @app.post("/api/v1/jobs", response_model=JobResponse)
 async def create_job(prompt: str = Form(...), files: list[UploadFile] = File(...)):
@@ -109,8 +110,7 @@ def create_integration_access(job_id: str):
 @app.get("/api/v1/integrations/{job_id}/data")
 def integration_data(job_id: str, authorization: str | None = Header(default=None)):
     require_key(job_id, authorization)
-    job = get_job_or_404(job_id)
-    return {"job_id": job_id, "data": job["charts"]}
+    return {"job_id": job_id, "data": get_job_or_404(job_id)["charts"]}
 
 @app.get("/api/v1/integrations/{job_id}/json")
 def integration_json(job_id: str, authorization: str | None = Header(default=None)):
@@ -121,6 +121,12 @@ def integration_json(job_id: str, authorization: str | None = Header(default=Non
 def integration_manifest(job_id: str, authorization: str | None = Header(default=None)):
     require_key(job_id, authorization)
     return DeliveryService.manifest(job_id, get_job_or_404(job_id))
+
+@app.get("/api/v1/integrations/{job_id}/json/download")
+def download_json(job_id: str, authorization: str | None = Header(default=None)):
+    require_key(job_id, authorization)
+    payload = json.dumps(DeliveryService.public_payload(job_id, get_job_or_404(job_id)), ensure_ascii=False, indent=2).encode("utf-8")
+    return Response(payload, media_type="application/json", headers={"Content-Disposition": f'attachment; filename="graphmind-{job_id}.json"'})
 
 @app.post("/api/v1/integrations/{job_id}/webhook")
 def configure_webhook(job_id: str, request: WebhookRequest, authorization: str | None = Header(default=None)):
@@ -169,4 +175,4 @@ def download_package(job_id: str, authorization: str | None = Header(default=Non
 def integration_openapi(job_id: str, authorization: str | None = Header(default=None)):
     require_key(job_id, authorization)
     get_job_or_404(job_id)
-    return {"name":"GraphMind Integration API","version":"1.0","authentication":"Bearer API key","endpoints":{"GET /data":"Structured chart knowledge","GET /json":"Complete JSON payload","GET /manifest":"Delivery manifest","GET /csv":"CSV export","GET /xlsx":"Excel export","GET /pdf":"PDF report","GET /package":"Complete ZIP package","POST /webhook":"Configure and test webhook","POST /share":"Create share link"}}
+    return {"name":"GraphMind Integration API","version":"1.0","authentication":"Bearer API key","endpoints":{"GET /data":"Structured chart knowledge","GET /json":"Complete JSON payload","GET /json/download":"JSON file export","GET /manifest":"Delivery manifest","GET /csv":"CSV export","GET /xlsx":"Excel export","GET /pdf":"PDF report","GET /package":"Complete ZIP package","POST /webhook":"Configure and test webhook","POST /share":"Create share link"}}
