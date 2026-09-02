@@ -2,12 +2,16 @@ from pathlib import Path
 from uuid import uuid4
 import shutil
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-app = FastAPI(title="GraphMind API", version="0.2.0")
-DATA_DIR = Path("data/jobs")
+ROOT = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT / "data" / "jobs"
+FRONTEND = ROOT / "frontend" / "index.html"
 JOBS: dict[str, dict] = {}
 SUPPORTED = {".png", ".jpg", ".jpeg", ".webp"}
+
+app = FastAPI(title="GraphMind API", version="0.3.0")
 
 class JobResponse(BaseModel):
     job_id: str
@@ -15,8 +19,13 @@ class JobResponse(BaseModel):
     files: int
     prompt: str
 
+@app.get("/", include_in_schema=False)
+def frontend():
+    return FileResponse(FRONTEND)
+
 @app.get("/health")
-def health(): return {"status": "ok", "service": "graphmind"}
+def health():
+    return {"status": "ok", "service": "graphmind"}
 
 @app.post("/api/v1/jobs", response_model=JobResponse)
 async def create_job(prompt: str = Form(...), files: list[UploadFile] = File(...)):
@@ -42,11 +51,13 @@ async def create_job(prompt: str = Form(...), files: list[UploadFile] = File(...
 @app.get("/api/v1/jobs/{job_id}")
 def get_job(job_id: str):
     job = JOBS.get(job_id)
-    if not job: raise HTTPException(404, "Job not found")
+    if not job:
+        raise HTTPException(404, "Job not found")
     return {"job_id": job_id, "status": job["status"], "charts": len(job["charts"])}
 
 @app.get("/api/v1/jobs/{job_id}/results")
 def get_results(job_id: str):
     job = JOBS.get(job_id)
-    if not job: raise HTTPException(404, "Job not found")
+    if not job:
+        raise HTTPException(404, "Job not found")
     return {"job_id": job_id, **job}
