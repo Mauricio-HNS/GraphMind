@@ -8,6 +8,7 @@ import secrets
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
+from app.services.chart_knowledge import CHART_KNOWLEDGE, SEMANTIC_TERMS
 from app.services.delivery import DeliveryService
 from app.services.chart_analysis import analyze_job
 
@@ -20,7 +21,7 @@ SHARES: dict[str, str] = {}
 SUPPORTED = {".png", ".jpg", ".jpeg", ".webp", ".pdf", ".csv", ".xlsx", ".xls", ".zip"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
-app = FastAPI(title="GraphMind API", version="0.6.0", description="Turn visual data into AI-ready knowledge and deliver it through APIs, webhooks and exports.")
+app = FastAPI(title="GraphMind API", version="0.7.0", description="Turn visual data into AI-ready knowledge and deliver it through APIs, webhooks and exports.")
 
 class JobResponse(BaseModel):
     job_id: str
@@ -56,7 +57,7 @@ def require_key(job_id: str, authorization: str | None) -> None:
 def send_webhook(url: str, payload: dict) -> None:
     try:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "User-Agent": "GraphMind/0.6"}, method="POST")
+        request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "User-Agent": "GraphMind/0.7"}, method="POST")
         with urllib.request.urlopen(request, timeout=10):
             pass
     except Exception:
@@ -68,7 +69,15 @@ def frontend():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "graphmind", "version": "0.6.0"}
+    return {"status": "ok", "service": "graphmind", "version": "0.7.0"}
+
+@app.get("/api/v1/knowledge/charts")
+def chart_knowledge():
+    return {"version": "1.0", "charts": CHART_KNOWLEDGE}
+
+@app.get("/api/v1/knowledge/concepts")
+def semantic_concepts():
+    return {"version": "1.0", "concepts": SEMANTIC_TERMS}
 
 @app.post("/api/v1/jobs", response_model=JobResponse)
 async def create_job(prompt: str = Form(...), files: list[UploadFile] = File(...)):
@@ -95,7 +104,7 @@ async def create_job(prompt: str = Form(...), files: list[UploadFile] = File(...
 @app.get("/api/v1/jobs/{job_id}")
 def get_job(job_id: str):
     job = get_job_or_404(job_id)
-    return {"job_id": job_id, "status": job["status"], "charts": len(job["charts"]), "analysis_status": job["analysis"]["status"], "safe_to_answer": job["analysis"]["safe_to_answer"]}
+    return {"job_id": job_id, "status": job["status"], "charts": len(job["charts"]), "analysis_status": job["analysis"]["status"], "safe_to_answer": job["analysis"]["safe_to_answer"], "confidence": job["analysis"].get("confidence", 0.0)}
 
 @app.get("/api/v1/jobs/{job_id}/results")
 def get_results(job_id: str):
@@ -181,4 +190,4 @@ def download_package(job_id: str, authorization: str | None = Header(default=Non
 def integration_openapi(job_id: str, authorization: str | None = Header(default=None)):
     require_key(job_id, authorization)
     get_job_or_404(job_id)
-    return {"name":"GraphMind Integration API","version":"1.1","authentication":"Bearer API key","endpoints":{"GET /data":"Structured chart knowledge","GET /json":"Complete JSON payload","GET /analysis":"Validated deterministic analysis","GET /json/download":"JSON file export","GET /manifest":"Delivery manifest","GET /csv":"CSV export","GET /xlsx":"Excel export","GET /pdf":"PDF report","GET /package":"Complete ZIP package","POST /webhook":"Configure and test webhook","POST /share":"Create share link"}}
+    return {"name":"GraphMind Integration API","version":"1.2","authentication":"Bearer API key","endpoints":{"GET /data":"Structured chart knowledge","GET /json":"Complete JSON payload","GET /analysis":"Validated deterministic analysis","GET /json/download":"JSON file export","GET /manifest":"Delivery manifest","GET /csv":"CSV export","GET /xlsx":"Excel export","GET /pdf":"PDF report","GET /package":"Complete ZIP package","POST /webhook":"Configure and test webhook","POST /share":"Create share link"}}
