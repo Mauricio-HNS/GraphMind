@@ -2,6 +2,12 @@
 
 GraphMind is a chart intelligence engine that transforms batches of charts into structured, AI-ready knowledge.
 
+<p align="center">
+  <a href="https://mauricio-hns.github.io/GraphMind/"><strong>TRY GRAPHMIND</strong></a> ·
+  <a href="https://mauricio-hns.github.io/GraphMind/">Web Interface</a> ·
+  <a href="https://github.com/Mauricio-HNS/GraphMind">Source Code</a>
+</p>
+
 ## Vision
 
 Upload one chart or hundreds of charts, describe what you want to discover, and let GraphMind prepare visual information for downstream AI analysis.
