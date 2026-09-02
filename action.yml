@@ -1,0 +1,73 @@
+name: GraphMind Chart Intelligence
+description: Analyze charts in a repository and generate structured, traceable AI-ready results.
+author: GraphMind
+branding:
+  icon: bar-chart-2
+  color: blue
+
+inputs:
+  input:
+    description: Directory containing charts/documents to analyze.
+    required: false
+    default: charts
+  prompt:
+    description: Natural-language analysis prompt.
+    required: false
+    default: Analyze the charts, identify trends, comparisons, rankings and anomalies, and return only findings supported by extracted evidence.
+  prompt-file:
+    description: Optional path to a Markdown/text file containing the analysis prompt.
+    required: false
+    default: prompts/analysis.md
+  output:
+    description: Directory where GraphMind writes analysis artifacts.
+    required: false
+    default: results
+  max-files:
+    description: Maximum number of input files to process.
+    required: false
+    default: "50"
+
+outputs:
+  analysis:
+    description: Path to the generated Markdown analysis.
+    value: ${{ steps.graphmind.outputs.analysis }}
+  json:
+    description: Path to the generated structured JSON result.
+    value: ${{ steps.graphmind.outputs.json }}
+  csv:
+    description: Path to the generated CSV export.
+    value: ${{ steps.graphmind.outputs.csv }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install GraphMind dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -r "${{ github.action_path }}/backend/requirements.txt"
+
+    - name: Install OCR engine
+      shell: bash
+      run: |
+        if command -v apt-get >/dev/null 2>&1; then
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tesseract-ocr
+        fi
+
+    - name: Run GraphMind
+      id: graphmind
+      shell: bash
+      env:
+        GRAPHMIND_ACTION_PATH: ${{ github.action_path }}
+        GRAPHMIND_INPUT: ${{ inputs.input }}
+        GRAPHMIND_PROMPT: ${{ inputs.prompt }}
+        GRAPHMIND_PROMPT_FILE: ${{ inputs.prompt-file }}
+        GRAPHMIND_OUTPUT: ${{ inputs.output }}
+        GRAPHMIND_MAX_FILES: ${{ inputs.max-files }}
+      run: python "${{ github.action_path }}/scripts/github_action.py"
