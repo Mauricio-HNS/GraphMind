@@ -1,0 +1,33 @@
+name: GraphMind Analysis
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "charts/**"
+      - "prompts/**"
+      - ".github/workflows/example-graphmind.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Analyze charts with GraphMind
+        uses: Mauricio-HNS/GraphMind@main
+        with:
+          input: charts
+          prompt-file: prompts/analysis.md
+          output: results
+          max-files: "50"
+
+      - name: Publish results
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "chore: update GraphMind analysis"
+          file_pattern: results/*
