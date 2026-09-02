@@ -3,7 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from app.models.chart import ChartDocument, ChartRegion
+from app.models.chart import ChartDocument
+from app.services.ocr import OCRService
+from app.services.vision_segmenter import VisionSegmenter
 
 
 class ChartExtractor(Protocol):
@@ -12,13 +14,11 @@ class ChartExtractor(Protocol):
 
 
 class BasicImageExtractor:
-    """Dependency-light first extractor.
-
-    It establishes the visual-processing contract without pretending to recover
-    chart values before OCR/VLM adapters are connected.
-    """
-
     SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+
+    def __init__(self) -> None:
+        self.segmenter = VisionSegmenter()
+        self.ocr = OCRService()
 
     def extract(self, path: Path) -> ChartDocument:
         chart_id = path.stem
@@ -28,15 +28,10 @@ class BasicImageExtractor:
             metadata={"source_path": str(path)},
         )
 
-        if path.suffix.lower() in self.SUPPORTED_IMAGE_EXTENSIONS:
-            document.regions.append(
-                ChartRegion(
-                    id=f"{chart_id}:full",
-                    kind="full_chart",
-                    description="Original chart image. Awaiting OCR/VLM extraction.",
-                    bbox=[0, 0, 1, 1],
-                    confidence=1.0,
-                )
-            )
+        if path.suffix.lower() not in self.SUPPORTED_IMAGE_EXTENSIONS:
+            return document
 
+        document.regions = self.segmenter.segment(path)
+        document.metadata["ocr_text"] = self.ocr.extract_text(path)
+        document.metadata["processing_stage"] = "ocr_and_visual_segmentation_complete"
         return document
