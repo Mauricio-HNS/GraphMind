@@ -9,6 +9,7 @@ from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from app.services.delivery import DeliveryService
+from app.services.chart_analysis import analyze_job
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data" / "jobs"
@@ -19,7 +20,7 @@ SHARES: dict[str, str] = {}
 SUPPORTED = {".png", ".jpg", ".jpeg", ".webp", ".pdf", ".csv", ".xlsx", ".xls", ".zip"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
-app = FastAPI(title="GraphMind API", version="0.5.1", description="Turn visual data into AI-ready knowledge and deliver it through APIs, webhooks and exports.")
+app = FastAPI(title="GraphMind API", version="0.6.0", description="Turn visual data into AI-ready knowledge and deliver it through APIs, webhooks and exports.")
 
 class JobResponse(BaseModel):
     job_id: str
@@ -55,7 +56,7 @@ def require_key(job_id: str, authorization: str | None) -> None:
 def send_webhook(url: str, payload: dict) -> None:
     try:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "User-Agent": "GraphMind/0.5"}, method="POST")
+        request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "User-Agent": "GraphMind/0.6"}, method="POST")
         with urllib.request.urlopen(request, timeout=10):
             pass
     except Exception:
@@ -67,7 +68,7 @@ def frontend():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "graphmind", "version": "0.5.1"}
+    return {"status": "ok", "service": "graphmind", "version": "0.6.0"}
 
 @app.post("/api/v1/jobs", response_model=JobResponse)
 async def create_job(prompt: str = Form(...), files: list[UploadFile] = File(...)):
@@ -87,25 +88,30 @@ async def create_job(prompt: str = Form(...), files: list[UploadFile] = File(...
         raise HTTPException(400, "No supported documents uploaded")
     from app.services.processor import process_file
     results = [process_file(path, prompt) if Path(path).suffix.lower() in IMAGE_EXTENSIONS else {"chart": {"chart_id": Path(path).stem, "source_file": Path(path).name, "metadata": {"source_path": path}}, "analysis_plan": {}, "chunks": [], "processing": {"status": "ingested", "supported": True}} for path in accepted]
-    JOBS[job_id] = {"status": "completed", "prompt": prompt, "charts": results, "webhook": None}
+    analysis = analyze_job(results, prompt)
+    JOBS[job_id] = {"status": "completed", "prompt": prompt, "charts": results, "analysis": analysis, "webhook": None}
     return JobResponse(job_id=job_id, status="completed", files=len(accepted), prompt=prompt)
 
 @app.get("/api/v1/jobs/{job_id}")
 def get_job(job_id: str):
     job = get_job_or_404(job_id)
-    return {"job_id": job_id, "status": job["status"], "charts": len(job["charts"])}
+    return {"job_id": job_id, "status": job["status"], "charts": len(job["charts"]), "analysis_status": job["analysis"]["status"], "safe_to_answer": job["analysis"]["safe_to_answer"]}
 
 @app.get("/api/v1/jobs/{job_id}/results")
 def get_results(job_id: str):
     job = get_job_or_404(job_id)
     return {"job_id": job_id, **job}
 
+@app.get("/api/v1/jobs/{job_id}/analysis")
+def get_analysis(job_id: str):
+    return {"job_id": job_id, "analysis": get_job_or_404(job_id)["analysis"]}
+
 @app.post("/api/v1/integrations/{job_id}/access", response_model=ApiAccessResponse)
 def create_integration_access(job_id: str):
     get_job_or_404(job_id)
     key = DeliveryService.create_api_key()
     API_KEYS[job_id] = key
-    return ApiAccessResponse(job_id=job_id, api_key=key, base_url=f"/api/v1/integrations/{job_id}", endpoints={"data":f"/api/v1/integrations/{job_id}/data","json":f"/api/v1/integrations/{job_id}/json","manifest":f"/api/v1/integrations/{job_id}/manifest","status":f"/api/v1/jobs/{job_id}"})
+    return ApiAccessResponse(job_id=job_id, api_key=key, base_url=f"/api/v1/integrations/{job_id}", endpoints={"data":f"/api/v1/integrations/{job_id}/data","json":f"/api/v1/integrations/{job_id}/json","analysis":f"/api/v1/jobs/{job_id}/analysis","manifest":f"/api/v1/integrations/{job_id}/manifest","status":f"/api/v1/jobs/{job_id}"})
 
 @app.get("/api/v1/integrations/{job_id}/data")
 def integration_data(job_id: str, authorization: str | None = Header(default=None)):
@@ -175,4 +181,4 @@ def download_package(job_id: str, authorization: str | None = Header(default=Non
 def integration_openapi(job_id: str, authorization: str | None = Header(default=None)):
     require_key(job_id, authorization)
     get_job_or_404(job_id)
-    return {"name":"GraphMind Integration API","version":"1.0","authentication":"Bearer API key","endpoints":{"GET /data":"Structured chart knowledge","GET /json":"Complete JSON payload","GET /json/download":"JSON file export","GET /manifest":"Delivery manifest","GET /csv":"CSV export","GET /xlsx":"Excel export","GET /pdf":"PDF report","GET /package":"Complete ZIP package","POST /webhook":"Configure and test webhook","POST /share":"Create share link"}}
+    return {"name":"GraphMind Integration API","version":"1.1","authentication":"Bearer API key","endpoints":{"GET /data":"Structured chart knowledge","GET /json":"Complete JSON payload","GET /analysis":"Validated deterministic analysis","GET /json/download":"JSON file export","GET /manifest":"Delivery manifest","GET /csv":"CSV export","GET /xlsx":"Excel export","GET /pdf":"PDF report","GET /package":"Complete ZIP package","POST /webhook":"Configure and test webhook","POST /share":"Create share link"}}
