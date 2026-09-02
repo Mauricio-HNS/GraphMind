@@ -6,6 +6,52 @@ GraphMind is a chart intelligence engine that transforms batches of charts into 
 
 Upload one chart or hundreds of charts, describe what you want to discover, and let GraphMind prepare visual information for downstream AI analysis.
 
+## GitHub-native mode
+
+GraphMind can run directly inside GitHub Actions. A repository becomes the analysis workspace: put charts in a folder, write the question in a Markdown prompt, and GraphMind generates versioned Markdown, JSON and CSV results.
+
+```text
+charts/
+  sales-2024.png
+  sales-2025.png
+
+prompts/
+  analysis.md
+
+results/
+  analysis.md
+  analysis.json
+  extracted-data.csv
+```
+
+The repository can use the GraphMind Action with:
+
+```yaml
+name: GraphMind Analysis
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "charts/**"
+      - "prompts/**"
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Mauricio-HNS/GraphMind@main
+        with:
+          input: charts
+          prompt-file: prompts/analysis.md
+          output: results
+```
+
+GraphMind Actions are built on GitHub's reusable automation model, so the same analysis workflow can be reused across repositories. For production, pin the Action to a release tag or commit SHA rather than `main`. citeturn0search0turn0search4
+
+The included example workflow at `.github/workflows/example-graphmind.yml` can be copied into another repository and adapted to its chart directory.
+
 ## Pipeline
 
 ```text
@@ -38,12 +84,6 @@ GET  /api/v1/integrations/{job_id}/openapi
 POST /api/v1/integrations/{job_id}/webhook
 ```
 
-The generated API key is used as:
-
-```text
-Authorization: Bearer gm_...
-```
-
 ## Core principle
 
 GraphMind must not rely only on image embeddings. Numerical questions should be answered from structured chart data whenever possible, while the original image and extracted regions remain available for traceability.
@@ -68,4 +108,4 @@ Then open the GraphMind interface at the server root. FastAPI also exposes inter
 
 ## Project status
 
-Early MVP with a functional delivery/integration layer. OCR and visual extraction remain pluggable components; full numeric chart extraction still requires a production-grade vision/model adapter.
+Private-beta/early MVP. The GitHub-native workflow is now available for repository-based chart analysis. OCR and visual extraction remain pluggable components; full numeric chart extraction still requires a production-grade vision/model adapter. Low-confidence results must remain explicitly marked for review rather than being presented as verified facts.
