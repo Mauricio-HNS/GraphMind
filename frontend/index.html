@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GraphMind</title>
+  <style>
+    :root{--bg:#0d0d0d;--panel:#151515;--panel2:#1b1b1b;--text:#f5f5f5;--muted:#8a8a8a;--yellow:#ffd21f;--mustard:#b89400;--border:#292929}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    button,input,textarea{font:inherit}.app{display:flex;min-height:100vh}.sidebar{width:245px;border-right:1px solid var(--border);padding:24px 16px;background:#101010}.brand{font-size:21px;font-weight:800;letter-spacing:.04em;margin:0 8px 35px}.brand span{color:var(--yellow)}.section{color:#666;font-size:10px;letter-spacing:.15em;margin:25px 10px 9px}.nav button{display:block;width:100%;text-align:left;background:transparent;border:0;color:#aaa;padding:11px 12px;border-radius:8px;cursor:pointer}.nav button:hover,.nav button.active{background:#1c1c1c;color:#fff}.nav button.active{border-left:2px solid var(--yellow)}.main{flex:1}.top{height:72px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:flex-end;padding:0 30px;gap:20px}.avatar{width:35px;height:35px;border-radius:50%;background:var(--yellow);color:#111;display:grid;place-items:center;font-weight:800}.user{display:flex;align-items:center;gap:10px}.content{max-width:1180px;margin:auto;padding:38px}.eyebrow{color:var(--yellow);font-size:11px;letter-spacing:.15em}.title{font-size:34px;margin:8px 0 6px}.subtitle{color:var(--muted);margin-bottom:30px}.upload{border:1px dashed #555;border-radius:14px;background:var(--panel);padding:55px 25px;text-align:center;transition:.2s}.upload.drag{border-color:var(--yellow);background:#17150a}.plus{font-size:35px;color:var(--yellow)}.upload h2{margin:10px 0}.upload p{color:var(--muted)}.btn{background:var(--yellow);border:0;border-radius:8px;padding:12px 20px;color:#111;font-weight:800;cursor:pointer}.btn:hover{filter:brightness(1.08)}.prompt{margin-top:22px}.prompt label{display:block;margin-bottom:8px;color:#bbb}.prompt textarea{width:100%;min-height:100px;resize:vertical;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:white;padding:15px;outline:none}.prompt textarea:focus{border-color:var(--mustard)}.actions{display:flex;justify-content:flex-end;margin-top:14px}.files{margin-top:25px;display:none;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px}.file{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #252525}.file:last-child{border:0}.muted{color:var(--muted)}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:35px}.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px}.card small{color:var(--muted)}.card strong{display:block;font-size:24px;margin-top:8px}.status{margin-top:25px;display:none}.bar{height:7px;background:#252525;border-radius:99px;overflow:hidden;margin-top:10px}.bar i{display:block;height:100%;width:0;background:var(--yellow);transition:width .3s}.message{margin-top:10px;color:#aaa}@media(max-width:800px){.sidebar{width:70px}.brand{font-size:0}.brand span{font-size:20px}.nav button{font-size:0}.nav button:before{content:"•";font-size:18px;color:#777}.content{padding:25px}.cards{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><span>◈</span> GRAPHMIND</div>
+    <div class="section">WORKSPACE</div><nav class="nav">
+      <button class="active">⌂ &nbsp; Dashboard</button><button>▣ &nbsp; Projects</button><button>◫ &nbsp; Documents</button><button>◎ &nbsp; Collections</button>
+    </nav>
+    <div class="section">INTELLIGENCE</div><nav class="nav"><button>◉ &nbsp; Analyses</button><button>◇ &nbsp; Knowledge</button><button>⌁ &nbsp; AI Chat</button></nav>
+    <div class="section">OUTPUT</div><nav class="nav"><button>▤ &nbsp; Reports</button><button>⇩ &nbsp; Exports</button></nav>
+    <div class="section">ACCOUNT</div><nav class="nav"><button>⚙ &nbsp; Settings</button><button>◈ &nbsp; Plan & Billing</button></nav>
+  </aside>
+  <main class="main">
+    <header class="top"><span class="muted">Free plan</span><span>◌</span><div class="user"><span>Mauricio</span><div class="avatar">M</div></div></header>
+    <section class="content">
+      <div class="eyebrow">VISUAL DATA → AI KNOWLEDGE</div><h1 class="title">What do you want to discover?</h1><div class="subtitle">Upload your charts and let GraphMind turn visual data into structured intelligence.</div>
+      <div class="upload" id="drop"><div class="plus">＋</div><h2>Drop your documents here</h2><p>Images · PDF · CSV · Excel · ZIP</p><button class="btn" id="browse">Browse files</button><input id="files" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.pdf,.csv,.xlsx,.xls,.zip" hidden></div>
+      <div class="files" id="fileList"></div>
+      <div class="prompt"><label for="question">Analysis objective</label><textarea id="question" placeholder="Example: Compare sales by region and identify anomalies between 2021 and 2025."></textarea></div>
+      <div class="actions"><button class="btn" id="analyze">ANALYZE →</button></div>
+      <div class="status" id="status"><div>Processing <span id="count"></span></div><div class="bar"><i id="progress"></i></div><div class="message" id="message">Preparing files...</div></div>
+      <div class="cards"><div class="card"><small>DOCUMENTS</small><strong id="docCount">0</strong></div><div class="card"><small>ANALYSES</small><strong>0</strong></div><div class="card"><small>KNOWLEDGE</small><strong>0</strong></div></div>
+    </section>
+  </main>
+</div>
+<script>
+const drop=document.getElementById('drop'), input=document.getElementById('files'), browse=document.getElementById('browse'), list=document.getElementById('fileList'), count=document.getElementById('docCount'); let selected=[];
+browse.onclick=()=>input.click(); input.onchange=e=>setFiles([...e.target.files]);
+['dragenter','dragover'].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.classList.add('drag')})); ['dragleave','drop'].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.classList.remove('drag')})); drop.addEventListener('drop',e=>setFiles([...e.dataTransfer.files]));
+function setFiles(files){selected=files; count.textContent=files.length; list.style.display=files.length?'block':'none'; list.innerHTML=files.map(f=>`<div class="file"><span>${f.name}</span><span class="muted">${(f.size/1024/1024).toFixed(2)} MB</span></div>`).join('')}
+document.getElementById('analyze').onclick=async()=>{if(!selected.length)return alert('Select at least one document.');const prompt=document.getElementById('question').value.trim()||'Analyze these charts and identify important patterns, trends and anomalies.';const status=document.getElementById('status'), bar=document.getElementById('progress'), msg=document.getElementById('message');status.style.display='block';bar.style.width='15%';msg.textContent='Uploading files...';const form=new FormData();form.append('prompt',prompt);selected.forEach(f=>form.append('files',f));try{bar.style.width='45%';const r=await fetch('/api/v1/jobs',{method:'POST',body:form});const data=await r.json();if(!r.ok)throw new Error(data.detail||'Processing failed');bar.style.width='100%';msg.textContent=`Job ${data.job_id} completed — ${data.files} files processed.`;}catch(e){bar.style.width='0';msg.textContent=e.message;}}
+</script>
+</body></html>
