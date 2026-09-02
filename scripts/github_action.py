@@ -102,6 +102,13 @@ def markdown(analysis: dict, results: list[dict], prompt: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def set_output(name: str, value: Path) -> None:
+    output_file = os.getenv("GITHUB_OUTPUT")
+    if output_file:
+        with open(output_file, "a", encoding="utf-8") as handle:
+            handle.write(f"{name}={value}\n")
+
+
 def main() -> None:
     input_dir = WORKSPACE / os.getenv("GRAPHMIND_INPUT", "charts")
     output_dir = WORKSPACE / os.getenv("GRAPHMIND_OUTPUT", "results")
@@ -132,9 +139,9 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(flatten_rows(results))
 
-    print(f"::set-output name=analysis::{md_path}")
-    print(f"::set-output name=json::{json_path}")
-    print(f"::set-output name=csv::{csv_path}")
+    set_output("analysis", md_path)
+    set_output("json", json_path)
+    set_output("csv", csv_path)
     print(f"GraphMind processed {len(files)} file(s). Status={analysis.get('status')} confidence={analysis.get('confidence', 0):.2f}")
 
 
