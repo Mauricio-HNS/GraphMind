@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from app.models.chart import ChartDocument
 from app.services.chunker import build_retrieval_chunks
+from app.services.extractor import BasicImageExtractor
 from app.services.prompt_planner import build_analysis_plan
 
 
@@ -10,24 +11,28 @@ SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".pdf"}
 
 
 def process_file(path: str, prompt: str) -> dict:
-    """Build the processing envelope for one uploaded chart/document.
-
-    Actual OCR/vision extraction is deliberately isolated from this contract.
-    This lets us plug in OpenCV, OCR, VLMs or external chart extractors later.
-    """
+    """Process one chart while keeping extraction replaceable."""
     source = Path(path)
-    chart = ChartDocument(
-        chart_id=str(uuid4()),
-        source_file=source.name,
-        metadata={"extension": source.suffix.lower()},
-    )
+    extension = source.suffix.lower()
+
+    if extension in BasicImageExtractor.SUPPORTED_IMAGE_EXTENSIONS:
+        chart = BasicImageExtractor().extract(source)
+    else:
+        chart = ChartDocument(
+            chart_id=str(uuid4()),
+            source_file=source.name,
+            metadata={"extension": extension},
+        )
+
+    plan = build_analysis_plan(prompt)
+    chunks = build_retrieval_chunks(chart)
 
     return {
         "chart": chart.model_dump(),
-        "analysis_plan": build_analysis_plan(prompt),
-        "chunks": build_retrieval_chunks(chart),
+        "analysis_plan": plan,
+        "chunks": chunks,
         "processing": {
-            "status": "awaiting_visual_extraction",
-            "supported": source.suffix.lower() in SUPPORTED_EXTENSIONS,
+            "status": "awaiting_ocr_and_vlm" if extension in SUPPORTED_EXTENSIONS else "unsupported",
+            "supported": extension in SUPPORTED_EXTENSIONS,
         },
     }
