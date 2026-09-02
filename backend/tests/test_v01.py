@@ -28,6 +28,22 @@ def test_v01_end_to_end_exports_and_share():
     assert response.status_code == 200
     job_id = response.json()["job_id"]
 
+    status = client.get(f"/api/v1/jobs/{job_id}")
+    assert status.status_code == 200
+    assert status.json()["safe_to_answer"] is False
+
+    analysis = client.get(f"/api/v1/jobs/{job_id}/analysis")
+    assert analysis.status_code == 200
+    assert analysis.json()["analysis"]["guardrails"]["numeric_assertions_require_validation"] is True
+
+    knowledge = client.get("/api/v1/knowledge/charts")
+    assert knowledge.status_code == 200
+    assert "bar" in knowledge.json()["charts"]
+
+    concepts = client.get("/api/v1/knowledge/concepts")
+    assert concepts.status_code == 200
+    assert concepts.json()["concepts"]["yoy"] == "year_over_year"
+
     access = client.post(f"/api/v1/integrations/{job_id}/access")
     assert access.status_code == 200
     key = access.json()["api_key"]
