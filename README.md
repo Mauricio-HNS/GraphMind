@@ -48,7 +48,7 @@ jobs:
           output: results
 ```
 
-GraphMind Actions are built on GitHub's reusable automation model, so the same analysis workflow can be reused across repositories. For production, pin the Action to a release tag or commit SHA rather than `main`. citeturn0search0turn0search4
+For production use, pin the Action to a release tag or commit SHA rather than `main`.
 
 The included example workflow at `.github/workflows/example-graphmind.yml` can be copied into another repository and adapted to its chart directory.
 
