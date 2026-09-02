@@ -1,5 +1,9 @@
 # GraphMind
 
+<p align="center">
+  <img src="assets/graphmind-cover.jpg" alt="GraphMind" width="900" />
+</p>
+
 GraphMind is a chart intelligence engine that transforms batches of charts into structured, AI-ready knowledge.
 
 <p align="center">
