@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Protocol
 
 from app.models.chart import ChartDocument
+from app.services.chart_knowledge import validate_chart_structure
 from app.services.chart_parser import parse_ocr
 from app.services.ocr import OCRService
 from app.services.vision_segmenter import VisionSegmenter
@@ -36,5 +37,6 @@ class BasicImageExtractor:
         ocr_text = self.ocr.extract_text(path)
         document.metadata["ocr_text"] = ocr_text
         document = parse_ocr(document, ocr_text)
-        document.metadata["processing_stage"] = "ocr_visual_segmentation_and_structured_extraction"
+        document.metadata["knowledge_validation"] = validate_chart_structure(document)
+        document.metadata["processing_stage"] = "ocr_visual_segmentation_structured_extraction_and_validation"
         return document
