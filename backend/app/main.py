@@ -2,8 +2,10 @@ from pathlib import Path
 from uuid import uuid4
 import json
 import shutil
+import threading
+import urllib.request
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from app.services.delivery import DeliveryService
 
@@ -12,9 +14,11 @@ DATA_DIR = ROOT / "data" / "jobs"
 FRONTEND = ROOT / "frontend" / "index.html"
 JOBS: dict[str, dict] = {}
 API_KEYS: dict[str, str] = {}
-SUPPORTED = {".png", ".jpg", ".jpeg", ".webp"}
+SHARES: dict[str, str] = {}
+SUPPORTED = {".png", ".jpg", ".jpeg", ".webp", ".pdf", ".csv", ".xlsx", ".xls", ".zip"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
-app = FastAPI(title="GraphMind API", version="0.4.1", description="Turn visual data into AI-ready knowledge and deliver it through APIs, webhooks and exports.")
+app = FastAPI(title="GraphMind API", version="0.5.0", description="Turn visual data into AI-ready knowledge and deliver it through APIs, webhooks and exports.")
 
 class JobResponse(BaseModel):
     job_id: str
@@ -46,13 +50,23 @@ def require_key(job_id: str, authorization: str | None) -> None:
     if authorization != f"Bearer {key}":
         raise HTTPException(401, "Invalid API key")
 
+
+def send_webhook(url: str, payload: dict) -> None:
+    try:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "User-Agent": "GraphMind/0.5"}, method="POST")
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return response.status
+    except Exception:
+        return None
+
 @app.get("/", include_in_schema=False)
 def frontend():
     return FileResponse(FRONTEND)
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "graphmind", "version": "0.4.1"}
+    return {"status": "ok", "service": "graphmind", "version": "0.5.0"}
 
 @app.post("/api/v1/jobs", response_model=JobResponse)
 async def create_job(prompt: str = Form(...), files: list[UploadFile] = File(...)):
@@ -69,9 +83,9 @@ async def create_job(prompt: str = Form(...), files: list[UploadFile] = File(...
             shutil.copyfileobj(file.file, out)
         accepted.append(str(target))
     if not accepted:
-        raise HTTPException(400, "No supported chart images uploaded")
+        raise HTTPException(400, "No supported documents uploaded")
     from app.services.processor import process_file
-    results = [process_file(path, prompt) for path in accepted]
+    results = [process_file(path, prompt) if Path(path).suffix.lower() in IMAGE_EXTENSIONS else {"chart": {"chart_id": Path(path).stem, "source_file": Path(path).name, "metadata": {"source_path": path}}, "analysis_plan": {}, "chunks": [], "processing": {"status": "ingested", "supported": True}} for path in accepted]
     JOBS[job_id] = {"status": "completed", "prompt": prompt, "charts": results, "webhook": None}
     return JobResponse(job_id=job_id, status="completed", files=len(accepted), prompt=prompt)
 
@@ -111,18 +125,48 @@ def integration_manifest(job_id: str, authorization: str | None = Header(default
 @app.post("/api/v1/integrations/{job_id}/webhook")
 def configure_webhook(job_id: str, request: WebhookRequest, authorization: str | None = Header(default=None)):
     require_key(job_id, authorization)
-    get_job_or_404(job_id)["webhook"] = request.url
-    return {"job_id": job_id, "webhook": request.url, "status": "configured"}
+    job = get_job_or_404(job_id)
+    job["webhook"] = request.url
+    threading.Thread(target=send_webhook, args=(request.url, DeliveryService.public_payload(job_id, job)), daemon=True).start()
+    return {"job_id": job_id, "webhook": request.url, "status": "configured_and_test_sent"}
+
+@app.post("/api/v1/integrations/{job_id}/share")
+def create_share(job_id: str, authorization: str | None = Header(default=None)):
+    require_key(job_id, authorization)
+    get_job_or_404(job_id)
+    token = secrets.token_urlsafe(24)
+    SHARES[token] = job_id
+    return {"share_id": token, "url": f"/share/{token}"}
+
+@app.get("/share/{token}")
+def get_share(token: str):
+    job_id = SHARES.get(token)
+    if not job_id:
+        raise HTTPException(404, "Share link not found")
+    return DeliveryService.public_payload(job_id, get_job_or_404(job_id))
+
+@app.get("/api/v1/integrations/{job_id}/csv")
+def download_csv(job_id: str, authorization: str | None = Header(default=None)):
+    require_key(job_id, authorization)
+    return Response(DeliveryService.csv_bytes(job_id, get_job_or_404(job_id)), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="graphmind-{job_id}.csv"'})
+
+@app.get("/api/v1/integrations/{job_id}/xlsx")
+def download_xlsx(job_id: str, authorization: str | None = Header(default=None)):
+    require_key(job_id, authorization)
+    return Response(DeliveryService.xlsx_bytes(job_id, get_job_or_404(job_id)), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="graphmind-{job_id}.xlsx"'})
+
+@app.get("/api/v1/integrations/{job_id}/pdf")
+def download_pdf(job_id: str, authorization: str | None = Header(default=None)):
+    require_key(job_id, authorization)
+    return Response(DeliveryService.pdf_bytes(job_id, get_job_or_404(job_id)), media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="graphmind-{job_id}.pdf"'})
+
+@app.get("/api/v1/integrations/{job_id}/package")
+def download_package(job_id: str, authorization: str | None = Header(default=None)):
+    require_key(job_id, authorization)
+    return Response(DeliveryService.package_bytes(job_id, get_job_or_404(job_id)), media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="graphmind-{job_id}.zip"'})
 
 @app.get("/api/v1/integrations/{job_id}/openapi")
 def integration_openapi(job_id: str, authorization: str | None = Header(default=None)):
     require_key(job_id, authorization)
     get_job_or_404(job_id)
-    return {"name":"GraphMind Integration API","version":"1.0","authentication":"Bearer API key","endpoints":{"GET /data":"Structured chart knowledge","GET /json":"Complete JSON payload","GET /manifest":"Delivery manifest","POST /webhook":"Configure webhook"}}
-
-@app.get("/api/v1/integrations/{job_id}/download.json")
-def download_json(job_id: str, authorization: str | None = Header(default=None)):
-    require_key(job_id, authorization)
-    job = get_job_or_404(job_id)
-    payload = json.dumps(DeliveryService.public_payload(job_id, job), ensure_ascii=False, indent=2)
-    return JSONResponse(content={"filename":f"graphmind-{job_id}.json","content":payload})
+    return {"name":"GraphMind Integration API","version":"1.0","authentication":"Bearer API key","endpoints":{"GET /data":"Structured chart knowledge","GET /json":"Complete JSON payload","GET /manifest":"Delivery manifest","GET /csv":"CSV export","GET /xlsx":"Excel export","GET /pdf":"PDF report","GET /package":"Complete ZIP package","POST /webhook":"Configure and test webhook","POST /share":"Create share link"}}
